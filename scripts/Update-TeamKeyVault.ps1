@@ -9,8 +9,7 @@ Write-Output "Executing Update-TeamKeyVault.ps1"
 Write-Output "Team: $TeamName"
 Write-Output "Key Vault: $KeyVaultName"
 Write-Output "Env variables:"
-Get-ChildItem -Path Env:* | ForEach-Object { Write-Output "$($_.Name)=$($_.Value)" }
-
+#Get-ChildItem -Path Env:* | ForEach-Object { Write-Output "$($_.Name)=$($_.Value)" }
 
 if($env:AUTOMATION_ASSET_ACCOUNTID){
     

@@ -1,5 +1,5 @@
 resource "azurerm_key_vault" "kv" {
-  name                      = "alek-test-sub-keys"
+  name                      = var.keyvault_name
   location                  = azurerm_resource_group.rg.location
   resource_group_name       = azurerm_resource_group.rg.name
   sku_name                  = "standard"

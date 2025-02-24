@@ -2,7 +2,7 @@
 variable "subscriptions" {
   description = "List of subscriptions with metadata"
   type = list(object({
-    SubscriptionId   = string
+    SubscriptionId = string
     RotationDuration = optional(string)
   }))
 }
@@ -15,4 +15,8 @@ variable "resource_group_name" {
 variable "location" {
   description = "Azure region"
   type        = string
+}
+
+variable "keyvault_name" {
+  default = "alek-test-sub-keys"
 }
