@@ -4,28 +4,35 @@ param(
     [Parameter(Mandatory = $true)][ValidateNotNullOrEmpty()]
     [object]$Secret,
     [Parameter(Mandatory=$true)]
-    [datetime]$CurrentDate
+    [DateTime]$CurrentDate,
+    [Parameter(Mandatory=$true)]
+    [DateTime]$Origin,
+    [Parameter(Mandatory=$true)]
+    [TimeSpan]$Age
 )
 
 $newSecretValue = & "$PSScriptRoot/Get-RandomPassword.ps1" -Length 4
 $secretName = $Secret.Name
 
-$newTags = $Secret.Tags.Clone()
+$tags = $Secret.Tags.Clone()
 
-if ($newTags.ContainsKey("ForceRotation")) {
-    $newTags.Remove("ForceRotation")
+if ($tags.ContainsKey("ForceRotation")) {
+    $tags.Remove("ForceRotation")
 }
 
-$origin = [datetime]$newTags["Origin"]
-
-$elapsed = ($CurrentDate - $origin).Ticks
-$periodsElapsed = [math]::Floor($elapsed / $Lifespan.Ticks)
-$newExpiry = $origin.AddTicks($Lifespan.Ticks * ($periodsElapsed + 1))
+$elapsed = ($CurrentDate - $Origin).Ticks
+$periodsElapsed = [math]::Floor($elapsed / $Age.Ticks)
+$newExpiry = $origin.AddTicks($Age.Ticks * ($periodsElapsed + 1))
 
 Write-Output "Rotating secret '$secretName'. New expiry will be $newExpiry (calculated from Origin $origin)."
 
 # Create the new version of the secret with the new value, calculated expiry, and updated tags.
-Set-AzKeyVaultSecret -VaultName $KeyVaultName -Name $secretName `
+$newSecret = Set-AzKeyVaultSecret -VaultName $KeyVaultName -Name $secretName `
         -SecretValue (ConvertTo-SecureString $newSecretValue -AsPlainText -Force) `
         -Expires $newExpiry `
-        -Tag $newTags
+        -Tag $tags
+
+Write-Output "Rotated:"
+Write-Output $newSecret
+
+$newSecret

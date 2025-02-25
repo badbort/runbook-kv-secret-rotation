@@ -8,12 +8,6 @@ param(
 Write-Output "Executing Update-TeamKeyVault.ps1"
 Write-Output "Team: $TeamName"
 Write-Output "Key Vault: $KeyVaultName"
-Write-Output "Env variables:"
-#Get-ChildItem -Path Env:* | ForEach-Object { Write-Output "$($_.Name)=$($_.Value)" }
-
-if($env:AUTOMATION_ASSET_ACCOUNTID){
-    
-}
 
 # Ensure we are authenticated
 if (-not (Get-AzContext))
@@ -30,9 +24,6 @@ if (-not $secrets)
     Write-Output "No primary key secrets found in Key Vault '$KeyVaultName'."
     exit 0
 }
-
-Write-Output "PSScriptRoot: $PSScriptRoot"
-Write-Output "PSPrivateMetadata.JobId: $($PSPrivateMetadata.JobId)"
 
 $total = $secrets.Length
 $currentSecret = 0

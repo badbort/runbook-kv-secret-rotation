@@ -32,7 +32,7 @@ resource "azurerm_key_vault_secret" "primary" {
   tags = merge(
     {
       SubscriptionId  = each.key
-      OriginTimestamp = time_static.rotation_origin[each.key].rfc3339
+      Origin = time_static.rotation_origin[each.key].rfc3339
     },
     each.value.RotationDuration != null ? { Age = each.value.RotationDuration } : {}
   )
