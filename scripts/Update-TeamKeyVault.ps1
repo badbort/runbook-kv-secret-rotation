@@ -5,9 +5,7 @@ param(
     [string]$KeyVaultName
 )
 
-Write-Output "Executing Update-TeamKeyVault.ps1"
-Write-Output "Team: $TeamName"
-Write-Output "Key Vault: $KeyVaultName"
+Write-Output "Executing Update-TeamKeyVault.ps1. Team: $TeamName, Key Vault: $KeyVaultName"
 
 # Ensure we are authenticated
 if (-not (Get-AzContext))
@@ -37,21 +35,22 @@ foreach ($secret in $secrets)
     $secretDetails = Get-AzKeyVaultSecret -VaultName $KeyVaultName -Name $secret.Name
     $tags = $secretDetails.Tags
 
-    if ($tags)
-    {
-        Write-Output "Tags for $( $secret.Name ): $( $tags | ConvertTo-Json -Depth 2 )"
-    }
-    else
-    {
-        Write-Output "No tags found for $( $secret.Name )"
-    }
+#    if ($tags)
+#    {
+#        Write-Output "Tags for $( $secret.Name ): $( $tags | ConvertTo-Json -Depth 2 )"
+#    }
+#    else
+#    {
+#        Write-Output "No tags found for $( $secret.Name )"
+#    }
 
     if(-not $tags.ContainsKey("Age")) {
+        # Todo: Check ForceRotation on regular non-rotating secrets
         Write-Output "Skipping $prefix as is has no defined rotation"
         continue
     }
     
-    Write-Output "Processing Subscription: $prefix"
+    Write-Host "Processing Subscription: $prefix" -ForegroundColor Gray
 
     # Call Update-SubscriptionSecrets.ps1
 
@@ -66,26 +65,26 @@ foreach ($secret in $secrets)
             "Prefix" = $prefix
         }
 
-        Write-Host "Running SubscriptionSecrets runbook"
+#        Write-Host "Running SubscriptionSecrets runbook"
 
         Start-AzAutomationRunbook -Name "Update-SubscriptionSecrets" -Parameters $parameters
     } else {
         
-        Write-Host "Running SubscriptionSecrets locally"
+#        Write-Host "Running SubscriptionSecrets locally"
         
         & "$PSScriptRoot/Update-SubscriptionSecrets.ps1" -KeyVaultName $KeyVaultName -Prefix $prefix
     }
     
     # If DestinationSecret tag exists, invoke Update-DestinationKeyVault.ps1
-    if ($tags -and $tags.ContainsKey("DestinationSecret"))
-    {
-        $destinationSecretId = $tags["DestinationSecret"]
-        Write-Output "DestinationSecret found: $destinationSecretId"
-
-        & "$PSScriptRoot/Update-DestinationKeyVault.ps1" -SubscriptionId $prefix -DestinationSecretId $destinationSecretId
-    }
+#    if ($tags -and $tags.ContainsKey("DestinationSecret"))
+#    {
+#        $destinationSecretId = $tags["DestinationSecret"]
+#        Write-Output "DestinationSecret found: $destinationSecretId"
+#
+#        & "$PSScriptRoot/Update-DestinationKeyVault.ps1" -SubscriptionId $prefix -DestinationSecretId $destinationSecretId
+#    }
 
 #    Write-Progress -Activity "Processing subscriptions" -Status "Step $currentSecret of $total" -PercentComplete (($currentSecret / $total) * 100)
 }
 
-Write-Output "Update-TeamKeyVault.ps1 execution completed."
+#Write-Output "Update-TeamKeyVault.ps1 execution completed."

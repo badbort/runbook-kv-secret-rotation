@@ -3,7 +3,9 @@ param(
     [string]$Prefix
 )
 
-Write-Output "Executing Update-SubscriptionSecrets.ps1 on Key Vault: $KeyVaultName, Secret Prefix: $Prefix"
+$InformationPreference = "Continue"
+
+Write-Host "Executing Update-SubscriptionSecrets.ps1 on Key Vault: $KeyVaultName, Secret Prefix: $Prefix =============================="
 
 # Fetch secret
 $primarySecretName = "$Prefix-PrimaryKey"
@@ -18,7 +20,6 @@ $tags = $primarySecret.Tags
 
 $rotationCandidate = $null
 $currentDate = [System.DateTime]::UtcNow
-#$currentDate = Get-Date
 $rotatePrimary = $false
 $rotateSecondary = $false
 
@@ -26,109 +27,125 @@ $rotateSecondary = $false
 $lifespanString = $primarySecret.Tags["Age"]
 $lifespan = [System.Xml.XmlConvert]::ToTimeSpan($lifespanString)
 
-Write-Host "$Prefix has an age of $($age.TotalSeconds) seconds"
-
 # Ensure that the primary and secondary secret have an Origin tag. This is the date that is used to calculate the expiration date windows
 # It ensures that even if the script is run late, or paused for some time, the expirtation dates will always be consistent and a multiple
 # of age from the Origin time.
 
 $primaryOrigin = $null
 
-if (-not $primarySecret.Tags.ContainsKey("Origin")) {
-    $primaryOrigin = $currentDate  # ISO 8601 format
-    $primarySecret.Tags["Origin"] = $primaryOrigin.ToString("o")
-
-#    $secondaryOrigin = $currentDate.AddSeconds($age.TotalSeconds / 2)
-#    $secondarySecret.Tags["Origin"] = $secondaryOrigin.ToString("o")
-    Write-Output "Primary secret missing Origin. Setting primary origin to $primaryOrigin and secondary origin to $secondaryOrigin."
+# Origin is considered the date that the secret rotaton should always align with. No matter if the script was
+# late, or there was a forced rotation, the expiration should always fall on a multiple of Age from the Origin
+if ($primarySecret.Expires -eq $null)
+{
+    $primaryOrigin = $currentDate
+    Write-Host "Primary secret does not have expiration. Using date $primaryOrigin for origin" -ForegroundColor Yellow
 }
 else
 {
-    $primaryOrigin = [DateTime]::Parse($primarySecret.Tags["Origin"])
+    #    $primaryOrigin = [DateTime]::Parse($primarySecret.Tags["Origin"])
+    $primaryOrigin = $primarySecret.Expires
 }
 
-$secondaryOrigin = $primaryOrigin.AddSeconds($age.TotalSeconds / 2)
+$secondaryOrigin = $primaryOrigin.AddTicks($lifespan.Ticks * -2.5)
 
-Write-Output "Using date $currentDate for expiration check. $Prefix has a lifespan of $lifespan ($lifespanString)"
+# Old tag based Origin approach
+#if (-not $primarySecret.Tags.ContainsKey("Origin")) {
+#    $primaryOrigin = $currentDate  # ISO 8601 format
+##    $primarySecret.Tags["Origin"] = $primaryOrigin.ToString("o")
+#
+##    $secondaryOrigin = $currentDate.AddSeconds($age.TotalSeconds / 2)
+##    $secondarySecret.Tags["Origin"] = $secondaryOrigin.ToString("o")
+#    Write-Information "Primary secret missing Origin. Setting primary origin to $primaryOrigin and secondary origin to $secondaryOrigin."
+#}
+#else
+#{
+#    $primaryOrigin = [DateTime]::Parse($primarySecret.Tags["Origin"])
+#}
 
-if ( $primarySecret.Tags.ContainsKey("ForceRotation") -and $secondarySecret.Tags.ContainsKey("ForceRotation"))
+# Write-Information "Using date $currentDate for expiration check. $Prefix has a lifespan of $lifespan ($lifespanString)"
+
+if ($primarySecret.Tags.ContainsKey("ForceRotation") -and $secondarySecret.Tags.ContainsKey("ForceRotation"))
 {
     $rotatePrimary = $true
     $rotateSecondary = $true
     $primaryReason = "Primary and secondary keys have ForceRotation tag."
     $secondaryReason = $primaryReason
-    
-    Write-Output "Both keys are being rotated. This may cause some downtime"
+
+    Write-Host "Both keys are being rotated due to ForceRotation tag. This may cause some downtime." -ForegroundColor Magenta
 }
 elseif ( $primarySecret.Tags.ContainsKey("ForceRotation"))
 {
     $rotatePrimary = $true
     $primaryReason = "Primary key has ForceRotation tag."
 }
-elseif($null -eq $primarySecret.Expires)
-{
-    $rotatePrimary = $true
-    $primaryReason = "Primary key has no expiration date"
-}
 elseif ($secondarySecret.Tags.ContainsKey("ForceRotation"))
 {
     $rotateSecondary = $true
     $secondaryReason = "Secondary key has ForceRotation tag."
+}
+elseif($primarySecret.Expires -eq $null)
+{
+    $rotatePrimary = $true
+    $primaryReason = "Primary key has no expiration date"
 }
 elseif($null -eq $secondarySecret.Expires)
 {
     $rotateSecondary = $true
     $secondaryReason = "Secondary key has no expiration date"
 }
-elseif ($primarySecret.Expires.ToUniversalTime() -gt $currentDate)
+elseif ($primarySecret.Expires.ToUniversalTime() -lt $currentDate)
 {
     $rotatePrimary = $true
     $primaryReason = "Primary key has expired."
 }
-elseif ($secondarySecret.Expires.ToUniversalTime() -gt $currentDate)
+elseif ($secondarySecret.Expires.ToUniversalTime() -lt $currentDate)
 {
     $rotateSecondary = $true
     $secondaryReason = "Secondary key has expired."
 }
 
-if($rotatePrimary -and $rotateSecondary) {
+if ($rotatePrimary -and $rotateSecondary)
+{
     # Todo: Maybe some special logic to give a 5 minute wait time between key rotations?
 }
 
-
 if ($rotatePrimary)
 {
-    Write-Output "Secret '$primarySecretName' will be rotated for reason: $primaryReason."
-
+    Write-Host "Rotating secret '$primarySecretName' for reason: $primaryReason" -ForegroundColor Blue
     $primarySecret = & "$PSScriptRoot/Rotate-KeyVaultSecret.ps1" -Secret $primarySecret -CurrentDate $currentDate -KeyVaultName $KeyVaultName -Age $lifespan -Origin $primaryOrigin
 }
 
 if ($rotateSecondary)
 {
-    Write-Output "Secret '$secondarySecretName' will be rotated for reason: $primaryReason."
-
+    Write-Host "Rotating secret '$secondarySecretName' for reason: $secondaryReason" -ForegroundColor Blue
     $secondarySecret = & "$PSScriptRoot/Rotate-KeyVaultSecret.ps1" -Secret $secondarySecret -CurrentDate $currentDate -KeyVaultName $KeyVaultName -Age $lifespan -Origin $secondaryOrigin
 }
 
-if (-not ($rotatePrimary -or $rotateSecondary)) {
-    Write-Output "No keys need to be rotated for $Prefix."
+# Update active secret
+if (-not ($rotatePrimary -or $rotateSecondary))
+{
+    Write-Host "No keys were changed for $Prefix." -ForegroundColor Green
 }
 else
 {
-    if ($primarySecret.Expires -gt $secondarySecret.Expires) {
+    $latestSecret = $null
+
+    if ($primarySecret.Expires -gt $secondarySecret.Expires)
+    {
+        $latestSecretName = $primarySecretName
         $latestSecret = $primarySecret
-        Write-Output "Primary secret selected (expires $($primarySecret.Expires))."
-    } else {
+        Write-Host "ActiveKey updated: Primary secret selected (expires $( $primarySecret.Expires ))." -ForegroundColor Cyan
+    }
+    else
+    {
+        $latestSecretName = $secondarySecretName
         $latestSecret = $secondarySecret
-        Write-Output "Secondary secret selected (expires $($secondarySecret.Expires))."
+        Write-Host "ActiveKey updated: Secondary secret selected (expires $( $secondarySecret.Expires ))." -ForegroundColor Cyan
     }
 
     $activeSecretTags = @{
-        'Source' =  $latestSecret.Name
+        'Source' = $latestSecret.Name
     }
-    
+
     Set-AzKeyVaultSecret -VaultName $KeyVaultName -Name $activeSecretName -SecretValue $latestSecret.SecretValue -Tag $activeSecretTags -Expires $latestSecret.Expires
 }
-
-Write-Output "Update-SubscriptionSecrets.ps1 execution completed."
-

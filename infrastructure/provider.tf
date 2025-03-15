@@ -15,10 +15,10 @@ provider "azurerm" {
   subscription_id = "bd8e250a-66a6-4038-acd8-0d6aced3e3c8"
   features {
     key_vault {
-      recover_soft_deleted_key_vaults = false
-      purge_soft_delete_on_destroy    = true
+      recover_soft_deleted_key_vaults       = false
+      purge_soft_delete_on_destroy          = true
       purge_soft_deleted_secrets_on_destroy = true
-      recover_soft_deleted_secrets = false
+      recover_soft_deleted_secrets          = false
     }
   }
 }

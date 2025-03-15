@@ -6,12 +6,11 @@ param(
 )
 
 Write-Host "=========================================="
-Write-Host " Running Terraform Apply - Auto Approve "
+Write-Host " Running Secret Rotation Loop "
 Write-Host "=========================================="
 
 # Get the timestamp
 $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
-Write-Host "[$timestamp] Running terraform apply..."
 
 $tfDir = "$PSScriptRoot\..\infrastructure"
 
@@ -20,12 +19,8 @@ $tfDir = "$PSScriptRoot\..\infrastructure"
 
 # Infinite loop to run Terraform apply every minute
 while ($true) {
-    Write-Host "=========================================="
-    Write-Host " Running Terraform Apply - Auto Approve "
-    Write-Host "=========================================="
-
     & "$PSScriptRoot/../scripts/Update-TeamKeyVault.ps1" -KeyVaultName $KeyVaultName -TeamName $TeamName
 
-    Write-Host "Waiting 30 seconds before next apply..."
-    Start-Sleep -Seconds 30
+    Write-Host "===== Waiting 5 seconds before next apply =====" -ForegroundColor Gray
+    Start-Sleep -Seconds 5
 }
